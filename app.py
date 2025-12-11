@@ -92,6 +92,8 @@ if not voter_df.empty:
     s1, s2 = st.columns(2)
     
     # Define text inputs
+    # Streamlit text_input updates automatically on every keystroke, achieving Search-As-You-Type.
+    # We do not need `on_change` or a submit button.
     with s1:
         q_name = st.text_input("👤 Voter Name", placeholder="Enter name...", key='name_input')
     with s2:
@@ -103,7 +105,7 @@ if not voter_df.empty:
     is_searching = bool(q_name or q_id)
     results = voter_df.copy()
 
-    # --- Filtering Logic (Search-As-You-Type) ---
+    # --- Filtering Logic (Incremental Search / Search-As-You-Type) ---
     if q_name:
         # Case-insensitive search on the 'Name' column
         results = results[results['Name'].str.contains(q_name, case=False, na=False)]
@@ -112,9 +114,9 @@ if not voter_df.empty:
         # Filter by SEC ID. Data is already string from load_combined_data.
         results = results[results['New SEC ID No.'].str.contains(q_id, na=False)]
 
-    # --- Display Logic (Kachani style: immediate results or metrics) ---
+    # --- Display Logic ---
     if is_searching:
-        # When actively searching, always display results immediately
+        # When actively searching (1 or more chars typed), display results immediately
         st.success(f"Matches Found: {len(results):,}")
         display_cols = ['Serial No.', 'Name', "Guardian's Name", 'OldWard No/ House No.', 
                         'House Name', 'Gender / Age', 'New SEC ID No.', 'Polling Station']
@@ -142,6 +144,7 @@ if os.path.exists("Flag.jpg"):
 st.write("Vattiyoorkavu Ward Management System v1.0")
 st.write("Designed by Shabna Salam A | Provided by Shabz Software Solutions")
 st.markdown('</div>', unsafe_allow_html=True)
+
 
 
 
