@@ -2,11 +2,13 @@ import streamlit as st
 import pandas as pd
 import glob
 import os
+import re
 
 # --- 1. PAGE CONFIG & ICON ---
 st.set_page_config(page_title="Vattiyoorkavu Voters Search", layout="wide", page_icon="🗳️")
 
 # --- 2. ADVANCED STYLING (CSS) ---
+# (CSS remains unchanged for brevity, but is included in the full script)
 st.markdown("""
     <style>
     .main { background-color: #f1f5f9; }
@@ -30,9 +32,8 @@ st.markdown("""
         border-top: 6px solid #de1e22;
         box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         margin-bottom: 30px;
-        min-height: 120px; 
     }
-    
+
     .bottom-branding {
         text-align: center;
         padding: 20px;
@@ -69,104 +70,95 @@ with col_right:
 def load_combined_data():
     files = glob.glob("csv_data/*.csv")
     if not files: return pd.DataFrame()
-    try:
-        df_list = []
-        for f in files:
-            df = pd.read_csv(f, encoding='latin1')
-            df_list.append(df.astype(str))
-        return pd.concat(df_list, ignore_index=True)
-    except Exception as e:
-        st.error(f"Error loading data: {e}")
-        return pd.DataFrame()
+    
+    df_list = [pd.read_csv(f, encoding='latin1') for f in files]
+    voter_df = pd.concat(df_list, ignore_index=True)
+    
+    if 'Name' in voter_df.columns:
+        voter_df['Name'] = voter_df['Name'].astype(str)
+    if 'New SEC ID No.' in voter_df.columns:
+        voter_df['New SEC ID No.'].fillna('', inplace=True) 
+        voter_df['New SEC ID No.'] = voter_df['New SEC ID No.'].astype(str)
+        
+    return voter_df
 
 voter_df = load_combined_data()
 
-# --- 5. SEARCH INTERFACE ---
+# --- 5. SESSION STATE AND CALLBACKS (The Live Search Enforcer) ---
+
+# 5a. Initialize search state
+if 'q_name' not in st.session_state:
+    st.session_state.q_name = ""
+if 'q_id' not in st.session_state:
+    st.session_state.q_id = ""
+
+# 5b. Callback functions (Crucial: These run on every character input)
+def update_name_search():
+    st.session_state.q_name = st.session_state.name_input.strip()
+
+def update_id_search():
+    st.session_state.q_id = st.session_state.id_input.strip()
+
+# --- 6. SEARCH INTERFACE (Uses Session State and Callbacks) ---
 if not voter_df.empty:
-    
-    # --- State Management Functions ---
-    # These functions save the latest input value into session state and force a rerun.
-    def update_search_state():
-        # st.rerun() is removed here. We rely only on the 'on_change' event triggering the app rerun.
-        # This resolves the InvalidFormCallbackError if it was persisting.
-        st.session_state.q_name = st.session_state.name_input
-        st.session_state.q_id = st.session_state.id_input
-
-    # --- Initialize Session State ---
-    if 'q_name' not in st.session_state: st.session_state['q_name'] = ''
-    if 'q_id' not in st.session_state: st.session_state['q_id'] = ''
-
-    # --- Search Inputs ---
     st.markdown('<div class="registry-box">', unsafe_allow_html=True)
-    col_name, col_id = st.columns(2)
+    st.write("### 🔍 Search Voter Registry (Search-As-You-Type Activated)")
+    s1, s2 = st.columns(2)
     
-    with col_name:
-        # Use on_change to force a state update on every keystroke
+    with s1:
+        # The key and on_change callback ensure a script rerun on every character change
         st.text_input(
             "👤 Voter Name", 
-            placeholder="Enter name...", 
-            key='name_input', 
-            on_change=update_search_state
+            placeholder="Start typing name...", 
+            key="name_input",
+            on_change=update_name_search
         )
-    with col_id:
+    with s2:
         st.text_input(
-            "🆔 SEC ID No.", 
-            placeholder="SEC034...", 
-            key='id_input', 
-            on_change=update_search_state
+            "🆔 SEC ID Number", 
+            placeholder="Start typing ID...", 
+            key="id_input",
+            on_change=update_id_search
         )
-            
+        
     st.markdown('</div>', unsafe_allow_html=True)
 
-    
-    # Get the latest values from session state for filtering
-    q_name = st.session_state.q_name
-    q_id = st.session_state.q_id
-
-    is_searching = bool(q_name or q_id)
     results = voter_df.copy()
-
-    # --- Filtering Logic (Incremental Search) ---
-    if q_name:
-        results = results[results['Name'].str.contains(q_name, case=False, na=False)]
-        
-    if q_id:
-        results = results[results['New SEC ID No.'].str.contains(q_id, na=False)]
-
-    # --- DISPLAY LOGIC (DataTable Style - Stable) ---
     
-    if is_searching:
-        num_results = len(results)
-        st.success(f"Matches Found: {num_results:,}")
+    current_q_name = st.session_state.q_name
+    current_q_id = st.session_state.q_id
+    
+    # 1. Filter by Name (Live, Case-Insensitive, Partial Match)
+    if current_q_name:
+        escaped_name = re.escape(current_q_name)
+        results = results[
+            results['Name'].str.contains(escaped_name, case=False, na=False, regex=True)
+        ]
         
-        if num_results > 0:
-            display_cols = ['Serial No.', 'Name', "Guardian's Name", 'OldWard No/ House No.', 
-                            'House Name', 'Gender / Age', 'New SEC ID No.', 'Polling Station']
-            
-            valid_display_cols = [col for col in display_cols if col in results.columns]
-            
-            st.data_editor(
-                results[valid_display_cols], 
-                use_container_width=True, 
-                hide_index=True, 
-                key='result_data_editor',
-                disabled=True
-            )
-            
-        else:
-            st.warning("No matching records found. Please check spelling or ID number.")
+    # 2. Filter by ID (Live, Partial Match)
+    if current_q_id:
+        escaped_id = re.escape(current_q_id)
+        results = results[
+            results['New SEC ID No.'].str.contains(escaped_id, na=False, regex=True)
+        ]
 
+    # --- Diagnostic Check (Visual Confirmation) ---
+    if current_q_name or current_q_id:
+        st.success(f"Typing Detected. Matches Found: {len(results):,}")
+        
+        display_cols = ['Serial No.', 'Name', "Guardian's Name", 'OldWard No/ House No.', 
+                        'House Name', 'Gender / Age', 'New SEC ID No.', 'Polling Station']
+        
+        st.dataframe(results[display_cols], use_container_width=True, hide_index=True)
     else:
-        # Only show metrics when no search is active
         m1, m2, m3 = st.columns(3)
         m1.metric("Registered Voters", f"{len(voter_df):,}")
         m2.metric("Ward Portions", "6 Portions")
         m3.metric("Ward", "Vattiyoorkavu")
-
 else:
-    st.error("Data missing in 'csv_data/' folder or data loading failed.")
-    
-# --- 6. BOTTOM BANNER ---
+    st.error("Data missing in 'csv_data/' folder. Please ensure your CSV files are present.")
+
+# --- 7. BOTTOM BANNER ---
 st.markdown("---")
 st.markdown('<div class="bottom-branding">', unsafe_allow_html=True)
 if os.path.exists("Flag.jpg"):
@@ -176,6 +168,7 @@ if os.path.exists("Flag.jpg"):
 st.write("Vattiyoorkavu Ward Management System v1.0")
 st.write("Designed by Shabna Salam A | Provided by Shabz Software Solutions")
 st.markdown('</div>', unsafe_allow_html=True)
+
 
 
 
