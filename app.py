@@ -109,6 +109,40 @@ if not voter_df.empty:
         results = results[results['Name'].str.contains(q_name, case=False, na=False)]
         
     if q_id:
+        # Filter by SEC ID. Data is already string from load_combined_data.
+        results = results[results['New SEC ID No.'].str.contains(q_id, na=False)]
+
+    # --- Display Logic (Kachani style: immediate results or metrics) ---
+    if is_searching:
+        # When actively searching, always display results immediately
+        st.success(f"Matches Found: {len(results):,}")
+        display_cols = ['Serial No.', 'Name', "Guardian's Name", 'OldWard No/ House No.', 
+                        'House Name', 'Gender / Age', 'New SEC ID No.', 'Polling Station']
+        
+        # Ensure only columns present in the DataFrame are displayed
+        valid_display_cols = [col for col in display_cols if col in results.columns]
+        
+        st.dataframe(results[valid_display_cols], use_container_width=True, hide_index=True)
+    else:
+        # Only show metrics when no search is active
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Registered Voters", f"{len(voter_df):,}")
+        m2.metric("Ward Portions", "6 Portions")
+        m3.metric("Ward", "Vattiyoorkavu")
+else:
+    st.error("Data missing in 'csv_data/' folder or data loading failed.")
+    
+# --- 6. BOTTOM BANNER ---
+st.markdown("---")
+st.markdown('<div class="bottom-branding">', unsafe_allow_html=True)
+if os.path.exists("Flag.jpg"):
+    col_f1, col_f2, col_f3 = st.columns([1, 1, 1])
+    with col_f2:
+        st.image("Flag.jpg", caption="CPI(M) Flag", use_container_width=True)
+st.write("Vattiyoorkavu Ward Management System v1.0")
+st.write("Designed by Shabna Salam A | Provided by Shabz Software Solutions")
+st.markdown('</div>', unsafe_allow_html=True)
+
 
 
 
