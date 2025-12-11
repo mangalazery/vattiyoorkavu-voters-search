@@ -40,10 +40,7 @@ st.markdown("""
         margin-top: 60px;
         color: #475569;
     }
-    /* FIX: Aggressively hide the necessary form submit button via CSS */
-    .stForm [data-testid="baseButton-secondary"] {
-        display: none !important;
-    }
+    /* Removed form-related CSS as the form is removed */
     </style>
     """, unsafe_allow_html=True)
 
@@ -88,41 +85,25 @@ voter_df = load_combined_data()
 # --- 5. SEARCH INTERFACE ---
 if not voter_df.empty:
     
-    # --- Search Inputs (Using Form for GUARANTEED RERUN) ---
+    # --- Search Inputs (Using native st.text_input, which updates on keystroke) ---
     
-    # Start the form container, which will force a rerun on every change
-    with st.form(key='search_form'):
-        st.markdown('<div class="registry-box">', unsafe_allow_html=True)
-        s1, s2 = st.columns(2)
-        
-        # Initialize session state for input values
-        if 'q_name' not in st.session_state: st.session_state['q_name'] = ''
-        if 'q_id' not in st.session_state: st.session_state['q_id'] = ''
+    # We rely on the natural behavior of st.text_input to update on every keystroke
+    # NO st.form, NO on_change, NO st.rerun() needed.
 
-        # Define update function to trigger the rerun and save the state
-        def update_search():
-            st.session_state.q_name = st.session_state.name_input
-            st.session_state.q_id = st.session_state.id_input
-            # Force a re-run of the app when inputs change
-            st.rerun() 
+    st.markdown('<div class="registry-box">', unsafe_allow_html=True)
+    s1, s2 = st.columns(2)
+    
+    with s1:
+        # q_name is updated instantly when a key is pressed
+        q_name = st.text_input("👤 Voter Name", placeholder="Enter name...", key='name_input')
+    with s2:
+        # q_id is updated instantly when a key is pressed
+        q_id = st.text_input("🆔 SEC ID Number", placeholder="SEC034...", key='id_input')
             
-        with s1:
-            # The 'on_change' and 'st.form' structure guarantee the update runs
-            # We use text_input's key to capture the value, and on_change to trigger the update
-            st.text_input("👤 Voter Name", placeholder="Enter name...", key='name_input', on_change=update_search)
-        with s2:
-            st.text_input("🆔 SEC ID Number", placeholder="SEC034...", key='id_input', on_change=update_search)
-            
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        # FIX: Provide a visible submit button to satisfy the validation rule, and then hide it via CSS
-        st.form_submit_button(label='Search', type='secondary')
+    st.markdown('</div>', unsafe_allow_html=True)
 
     
-    # Use the session state values for filtering
-    q_name = st.session_state.q_name
-    q_id = st.session_state.q_id
-
+    # The rest of the code is unchanged and will run immediately with the new q_name/q_id values.
     is_searching = bool(q_name or q_id)
     results = voter_df.copy()
 
@@ -133,7 +114,7 @@ if not voter_df.empty:
     if q_id:
         results = results[results['New SEC ID No.'].str.contains(q_id, na=False)]
 
-    # --- DISPLAY LOGIC (DataTable Style - Stabilized) ---
+    # --- DISPLAY LOGIC (DataTable Style - Stable) ---
     
     if is_searching:
         num_results = len(results)
@@ -176,8 +157,6 @@ if os.path.exists("Flag.jpg"):
 st.write("Vattiyoorkavu Ward Management System v1.0")
 st.write("Designed by Shabna Salam A | Provided by Shabz Software Solutions")
 st.markdown('</div>', unsafe_allow_html=True)
-
-
 
 
 
