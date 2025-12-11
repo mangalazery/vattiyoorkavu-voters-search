@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import glob
 import os
-import re # 👈 NEW: Required for safely escaping special characters in the search term
+import re # Required for safely escaping special characters in the search term
 
 # --- 1. PAGE CONFIG & ICON ---
 st.set_page_config(page_title="Vattiyoorkavu Voters Search", layout="wide", page_icon="🗳️")
@@ -64,7 +64,7 @@ with col_right:
     else:
         st.info("Candidate Image Required")
 
-# --- 4. DATA ENGINE (Updated for Data Type Consistency) ---
+# --- 4. DATA ENGINE (Data Type Consistency) ---
 @st.cache_data
 def load_combined_data():
     files = glob.glob("csv_data/*.csv")
@@ -73,7 +73,7 @@ def load_combined_data():
     df_list = [pd.read_csv(f, encoding='latin1') for f in files]
     voter_df = pd.concat(df_list, ignore_index=True)
     
-    # CRITICAL ENHANCEMENT: Ensure search columns are strings for reliable partial matching
+    # CRITICAL: Ensure search columns are explicitly strings for reliable partial matching
     if 'Name' in voter_df.columns:
         voter_df['Name'] = voter_df['Name'].astype(str)
     if 'New SEC ID No.' in voter_df.columns:
@@ -83,14 +83,14 @@ def load_combined_data():
 
 voter_df = load_combined_data()
 
-# --- 5. SEARCH INTERFACE (Updated for Live Search Robustness) ---
+# --- 5. SEARCH INTERFACE (The Live Search Mechanism) ---
 if not voter_df.empty:
     st.markdown('<div class="registry-box">', unsafe_allow_html=True)
-    st.write("### 🔍 Search Voter Registry (Live Filtering)")
+    st.write("### 🔍 Search Voter Registry (Live Filtering Active)")
     s1, s2 = st.columns(2)
     
     with s1:
-        # st.text_input causes instant rerun, enabling live search
+        # This input widget triggers a script rerun immediately upon every character change
         q_name = st.text_input("👤 Voter Name", placeholder="Start typing name...", key="name_input").strip()
     with s2:
         q_id = st.text_input("🆔 SEC ID Number", placeholder="Start typing ID...", key="id_input").strip()
@@ -101,10 +101,10 @@ if not voter_df.empty:
     
     # 1. Filter by Name (Live, Case-Insensitive, Partial Match)
     if q_name:
-        # re.escape treats characters like '(' or '.' as literal text, preventing search errors
+        # Use re.escape to handle names with special characters like '.', '(', etc.
         escaped_name = re.escape(q_name)
         results = results[
-            # regex=True is required when using re.escape
+            # str.contains performs the partial/fuzzy matching
             results['Name'].str.contains(escaped_name, case=False, na=False, regex=True)
         ]
         
@@ -116,6 +116,7 @@ if not voter_df.empty:
         ]
 
     if q_name or q_id:
+        # Results are displayed automatically because the script re-runs
         st.success(f"Matches Found: {len(results):,}")
         
         display_cols = ['Serial No.', 'Name', "Guardian's Name", 'OldWard No/ House No.', 
@@ -123,6 +124,7 @@ if not voter_df.empty:
         
         st.dataframe(results[display_cols], use_container_width=True, hide_index=True)
     else:
+        # Display summary metrics when the search boxes are empty
         m1, m2, m3 = st.columns(3)
         m1.metric("Registered Voters", f"{len(voter_df):,}")
         m2.metric("Ward Portions", "6 Portions")
@@ -140,5 +142,6 @@ if os.path.exists("Flag.jpg"):
 st.write("Vattiyoorkavu Ward Management System v1.0")
 st.write("Designed by Shabna Salam A | Provided by Shabz Software Solutions")
 st.markdown('</div>', unsafe_allow_html=True)
+
 
 
