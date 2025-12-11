@@ -39,6 +39,10 @@ st.markdown("""
         margin-top: 60px;
         color: #475569;
     }
+    /* Custom style for the expander title to allow HTML formatting */
+    .stExpander span {
+        font-size: 16px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -58,7 +62,6 @@ with col_center:
         """, unsafe_allow_html=True)
 
 with col_right:
-    # Updated to capitalized "Candidate.jpg"
     if os.path.exists("Candidate.jpg"):
         st.image("Candidate.jpg", use_container_width=True)
     else:
@@ -69,7 +72,6 @@ with col_right:
 def load_combined_data():
     files = glob.glob("csv_data/*.csv")
     if not files: return pd.DataFrame()
-    # Ensure all columns are treated as strings to handle mixed types correctly during search
     try:
         df_list = []
         for f in files:
@@ -88,62 +90,8 @@ if not voter_df.empty:
     
     # --- Search Inputs ---
     st.markdown('<div class="registry-box">', unsafe_allow_html=True)
-    st.write("### 🔍 Search Voter Registry")
-    s1, s2 = st.columns(2)
-    
-    # Define text inputs
-    # Streamlit text_input updates automatically on every keystroke, achieving Search-As-You-Type.
-    # We do not need `on_change` or a submit button.
-    with s1:
-        q_name = st.text_input("👤 Voter Name", placeholder="Enter name...", key='name_input')
-    with s2:
-        q_id = st.text_input("🆔 SEC ID Number", placeholder="SEC034...", key='id_input')
-        
-    st.markdown('</div>', unsafe_allow_html=True)
+    # Search box title removed
 
-    
-    is_searching = bool(q_name or q_id)
-    results = voter_df.copy()
-
-    # --- Filtering Logic (Incremental Search / Search-As-You-Type) ---
-    if q_name:
-        # Case-insensitive search on the 'Name' column
-        results = results[results['Name'].str.contains(q_name, case=False, na=False)]
-        
-    if q_id:
-        # Filter by SEC ID. Data is already string from load_combined_data.
-        results = results[results['New SEC ID No.'].str.contains(q_id, na=False)]
-
-    # --- Display Logic ---
-    if is_searching:
-        # When actively searching (1 or more chars typed), display results immediately
-        st.success(f"Matches Found: {len(results):,}")
-        display_cols = ['Serial No.', 'Name', "Guardian's Name", 'OldWard No/ House No.', 
-                        'House Name', 'Gender / Age', 'New SEC ID No.', 'Polling Station']
-        
-        # Ensure only columns present in the DataFrame are displayed
-        valid_display_cols = [col for col in display_cols if col in results.columns]
-        
-        st.dataframe(results[valid_display_cols], use_container_width=True, hide_index=True)
-    else:
-        # Only show metrics when no search is active
-        m1, m2, m3 = st.columns(3)
-        m1.metric("Registered Voters", f"{len(voter_df):,}")
-        m2.metric("Ward Portions", "6 Portions")
-        m3.metric("Ward", "Vattiyoorkavu")
-else:
-    st.error("Data missing in 'csv_data/' folder or data loading failed.")
-    
-# --- 6. BOTTOM BANNER ---
-st.markdown("---")
-st.markdown('<div class="bottom-branding">', unsafe_allow_html=True)
-if os.path.exists("Flag.jpg"):
-    col_f1, col_f2, col_f3 = st.columns([1, 1, 1])
-    with col_f2:
-        st.image("Flag.jpg", caption="CPI(M) Flag", use_container_width=True)
-st.write("Vattiyoorkavu Ward Management System v1.0")
-st.write("Designed by Shabna Salam A | Provided by Shabz Software Solutions")
-st.markdown('</div>', unsafe_allow_html=True)
 
 
 
