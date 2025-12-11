@@ -30,10 +30,9 @@ st.markdown("""
         border-top: 6px solid #de1e22;
         box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         margin-bottom: 30px;
-        /* Add fixed height or padding to prevent content shift */
         min-height: 120px; 
     }
-
+    
     .bottom-branding {
         text-align: center;
         padding: 20px;
@@ -41,13 +40,9 @@ st.markdown("""
         margin-top: 60px;
         color: #475569;
     }
-    /* Custom style for the expander title to allow HTML formatting */
-    /* Use a direct reference to the Streamlit expander button for better targeting */
-    [data-testid="stExpander"] button {
-        background-color: #f7f7f7 !important; 
-        border-radius: 8px !important;
-        margin-bottom: 5px;
-        padding: 10px 15px;
+    /* Hide the form submit button that we use to force reruns */
+    .stForm button {
+        display: none !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -93,18 +88,40 @@ voter_df = load_combined_data()
 # --- 5. SEARCH INTERFACE ---
 if not voter_df.empty:
     
-    # --- Search Inputs (ALWAYS VISIBLE) ---
-    st.markdown('<div class="registry-box">', unsafe_allow_html=True)
-    s1, s2 = st.columns(2)
+    # --- Search Inputs (Using Form for GUARANTEED RERUN) ---
     
-    with s1:
-        q_name = st.text_input("👤 Voter Name", placeholder="Enter name...", key='name_input')
-    with s2:
-        q_id = st.text_input("🆔 SEC ID Number", placeholder="SEC034...", key='id_input')
+    # Start the form container, which will force a rerun on every change
+    with st.form(key='search_form'):
+        st.markdown('<div class="registry-box">', unsafe_allow_html=True)
+        s1, s2 = st.columns(2)
         
-    st.markdown('</div>', unsafe_allow_html=True)
+        # Initialize session state for input values
+        if 'q_name' not in st.session_state: st.session_state['q_name'] = ''
+        if 'q_id' not in st.session_state: st.session_state['q_id'] = ''
+
+        # Define update function to trigger the rerun and save the state
+        def update_search():
+            st.session_state.q_name = st.session_state.name_input
+            st.session_state.q_id = st.session_state.id_input
+            # Force a re-run of the app when inputs change
+            st.rerun() 
+            
+        with s1:
+            # The 'on_change' and 'st.form' structure guarantee the update runs
+            st.text_input("👤 Voter Name", placeholder="Enter name...", key='name_input', on_change=update_search)
+        with s2:
+            st.text_input("🆔 SEC ID Number", placeholder="SEC034...", key='id_input', on_change=update_search)
+            
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # The hidden submit button forces the form to track changes and submit invisibly
+        st.form_submit_button(label='Invisible Search Trigger', invisible=True)
 
     
+    # Use the session state values for filtering
+    q_name = st.session_state.q_name
+    q_id = st.session_state.q_id
+
     is_searching = bool(q_name or q_id)
     results = voter_df.copy()
 
@@ -115,37 +132,28 @@ if not voter_df.empty:
     if q_id:
         results = results[results['New SEC ID No.'].str.contains(q_id, na=False)]
 
-    # --- DISPLAY LOGIC (Flicker Fix) ---
+    # --- DISPLAY LOGIC (DataTable Style - Stabilized) ---
     
-    # Use a container to hold the dynamic results. This helps manage the area.
-    result_container = st.container()
-
     if is_searching:
         num_results = len(results)
-        result_container.success(f"Matches Found: {num_results:,}")
+        st.success(f"Matches Found: {num_results:,}")
         
         if num_results > 0:
-            for index, row in results.iterrows():
-                serial_no = row.get('Serial No.', 'N/A')
-                sec_id = row.get('New SEC ID No.', 'N/A')
-                
-                # --- FIX FOR FLICKERING: Use a unique, persistent key for the expander ---
-                # The key must be stable across reruns for the open/close state to persist.
-                expander_key = f"voter_{sec_id}_{serial_no}" 
-                
-                expander_title = f"<span style='color: #de1e22; font-weight: bold;'>{row.get('Name', 'Name N/A')}</span> | ID: {sec_id}"
-                
-                # Use the container to place the result list
-                with result_container.expander(expander_title, expanded=False, key=expander_key):
-                    st.markdown(f"**Serial No.:** {serial_no}")
-                    st.markdown(f"**Guardian's Name:** {row.get('Guardian\'s Name', 'N/A')}")
-                    st.markdown(f"**Gender / Age:** {row.get('Gender / Age', 'N/A')}")
-                    st.markdown(f"**House No.:** {row.get('OldWard No/ House No.', 'N/A')}")
-                    st.markdown(f"**House Name:** {row.get('House Name', 'N/A')}")
-                    st.markdown(f"**Polling Station:** {row.get('Polling Station', 'N/A')}")
-                    
+            display_cols = ['Serial No.', 'Name', "Guardian's Name", 'OldWard No/ House No.', 
+                            'House Name', 'Gender / Age', 'New SEC ID No.', 'Polling Station']
+            
+            valid_display_cols = [col for col in display_cols if col in results.columns]
+            
+            st.data_editor(
+                results[valid_display_cols], 
+                use_container_width=True, 
+                hide_index=True, 
+                key='result_data_editor',
+                disabled=True
+            )
+            
         else:
-            result_container.warning("No matching records found. Try refining your search.")
+            st.warning("No matching records found. Try refining your search.")
 
     else:
         # Only show metrics when no search is active
