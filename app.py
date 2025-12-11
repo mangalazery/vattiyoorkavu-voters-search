@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import glob
 import os
-import re # Required for safely escaping special characters in the search term
+import re
 
 # --- 1. PAGE CONFIG & ICON ---
 st.set_page_config(page_title="Vattiyoorkavu Voters Search", layout="wide", page_icon="🗳️")
@@ -77,6 +77,7 @@ def load_combined_data():
     if 'Name' in voter_df.columns:
         voter_df['Name'] = voter_df['Name'].astype(str)
     if 'New SEC ID No.' in voter_df.columns:
+        voter_df['New SEC ID No.'].fillna('', inplace=True) # Ensure no NaNs to avoid filtering errors
         voter_df['New SEC ID No.'] = voter_df['New SEC ID No.'].astype(str)
         
     return voter_df
@@ -90,10 +91,11 @@ if not voter_df.empty:
     s1, s2 = st.columns(2)
     
     with s1:
-        # This input widget triggers a script rerun immediately upon every character change
-        q_name = st.text_input("👤 Voter Name", placeholder="Start typing name...", key="name_input").strip()
+        # st.text_input causes instant rerun upon every character change
+        # Note: 'key' removed as a troubleshooting step
+        q_name = st.text_input("👤 Voter Name", placeholder="Start typing name...").strip()
     with s2:
-        q_id = st.text_input("🆔 SEC ID Number", placeholder="Start typing ID...", key="id_input").strip()
+        q_id = st.text_input("🆔 SEC ID Number", placeholder="Start typing ID...").strip()
         
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -101,10 +103,8 @@ if not voter_df.empty:
     
     # 1. Filter by Name (Live, Case-Insensitive, Partial Match)
     if q_name:
-        # Use re.escape to handle names with special characters like '.', '(', etc.
         escaped_name = re.escape(q_name)
         results = results[
-            # str.contains performs the partial/fuzzy matching
             results['Name'].str.contains(escaped_name, case=False, na=False, regex=True)
         ]
         
@@ -116,7 +116,6 @@ if not voter_df.empty:
         ]
 
     if q_name or q_id:
-        # Results are displayed automatically because the script re-runs
         st.success(f"Matches Found: {len(results):,}")
         
         display_cols = ['Serial No.', 'Name', "Guardian's Name", 'OldWard No/ House No.', 
@@ -124,7 +123,6 @@ if not voter_df.empty:
         
         st.dataframe(results[display_cols], use_container_width=True, hide_index=True)
     else:
-        # Display summary metrics when the search boxes are empty
         m1, m2, m3 = st.columns(3)
         m1.metric("Registered Voters", f"{len(voter_df):,}")
         m2.metric("Ward Portions", "6 Portions")
@@ -142,6 +140,7 @@ if os.path.exists("Flag.jpg"):
 st.write("Vattiyoorkavu Ward Management System v1.0")
 st.write("Designed by Shabna Salam A | Provided by Shabz Software Solutions")
 st.markdown('</div>', unsafe_allow_html=True)
+
 
 
 
