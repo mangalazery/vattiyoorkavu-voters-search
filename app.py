@@ -30,6 +30,7 @@ st.markdown("""
         border-top: 6px solid #de1e22;
         box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         margin-bottom: 30px;
+        min-height: 120px; 
     }
     
     .bottom-branding {
@@ -38,12 +39,6 @@ st.markdown("""
         border-top: 2px solid #cbd5e1;
         margin-top: 60px;
         color: #475569;
-    }
-    /* Add styling for the new search row */
-    .search-row {
-        display: flex;
-        align-items: flex-end; /* Align button with text inputs */
-        gap: 10px;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -89,47 +84,58 @@ voter_df = load_combined_data()
 # --- 5. SEARCH INTERFACE ---
 if not voter_df.empty:
     
-    # --- Search Inputs and Button ---
+    # --- State Management Functions ---
+    # These functions save the latest input value into session state and force a rerun.
+    def update_search_state():
+        # st.rerun() is removed here. We rely only on the 'on_change' event triggering the app rerun.
+        # This resolves the InvalidFormCallbackError if it was persisting.
+        st.session_state.q_name = st.session_state.name_input
+        st.session_state.q_id = st.session_state.id_input
+
+    # --- Initialize Session State ---
+    if 'q_name' not in st.session_state: st.session_state['q_name'] = ''
+    if 'q_id' not in st.session_state: st.session_state['q_id'] = ''
+
+    # --- Search Inputs ---
     st.markdown('<div class="registry-box">', unsafe_allow_html=True)
-    
-    # Create 3 columns: Name Input, ID Input, and Search Button
-    col_name, col_id, col_btn = st.columns([3, 3, 1])
+    col_name, col_id = st.columns(2)
     
     with col_name:
-        q_name = st.text_input("👤 Voter Name", placeholder="Enter name...", key='name_input')
+        # Use on_change to force a state update on every keystroke
+        st.text_input(
+            "👤 Voter Name", 
+            placeholder="Enter name...", 
+            key='name_input', 
+            on_change=update_search_state
+        )
     with col_id:
-        q_id = st.text_input("🆔 SEC ID No.", placeholder="SEC034...", key='id_input')
-    
-    # Use session state to track if the search button was clicked
-    if 'search_submitted' not in st.session_state:
-        st.session_state.search_submitted = False
-
-    with col_btn:
-        # Add an empty markdown for vertical alignment (hack for Streamlit layout)
-        st.markdown("<div style='height: 29px;'></div>", unsafe_allow_html=True)
-        # Check if button is clicked
-        if st.button("Search", key="manual_search_btn", type='primary', use_container_width=True):
-            st.session_state.search_submitted = True
-        
+        st.text_input(
+            "🆔 SEC ID No.", 
+            placeholder="SEC034...", 
+            key='id_input', 
+            on_change=update_search_state
+        )
+            
     st.markdown('</div>', unsafe_allow_html=True)
 
     
-    # Determine if we should show results: either the button was clicked OR data is present
-    # If the user started typing, treat it as a search, but the button ensures the update runs.
+    # Get the latest values from session state for filtering
+    q_name = st.session_state.q_name
+    q_id = st.session_state.q_id
+
     is_searching = bool(q_name or q_id)
-    
     results = voter_df.copy()
 
-    # --- Filtering Logic ---
+    # --- Filtering Logic (Incremental Search) ---
     if q_name:
         results = results[results['Name'].str.contains(q_name, case=False, na=False)]
         
     if q_id:
         results = results[results['New SEC ID No.'].str.contains(q_id, na=False)]
 
-    # --- DISPLAY LOGIC ---
+    # --- DISPLAY LOGIC (DataTable Style - Stable) ---
     
-    if is_searching or st.session_state.search_submitted:
+    if is_searching:
         num_results = len(results)
         st.success(f"Matches Found: {num_results:,}")
         
@@ -170,6 +176,7 @@ if os.path.exists("Flag.jpg"):
 st.write("Vattiyoorkavu Ward Management System v1.0")
 st.write("Designed by Shabna Salam A | Provided by Shabz Software Solutions")
 st.markdown('</div>', unsafe_allow_html=True)
+
 
 
 
