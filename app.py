@@ -40,8 +40,8 @@ st.markdown("""
         margin-top: 60px;
         color: #475569;
     }
-    /* Hide the form submit button that we use to force reruns */
-    .stForm button {
+    /* FIX: Aggressively hide the necessary form submit button via CSS */
+    .stForm [data-testid="baseButton-secondary"] {
         display: none !important;
     }
     </style>
@@ -108,14 +108,15 @@ if not voter_df.empty:
             
         with s1:
             # The 'on_change' and 'st.form' structure guarantee the update runs
+            # We use text_input's key to capture the value, and on_change to trigger the update
             st.text_input("👤 Voter Name", placeholder="Enter name...", key='name_input', on_change=update_search)
         with s2:
             st.text_input("🆔 SEC ID Number", placeholder="SEC034...", key='id_input', on_change=update_search)
             
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # The hidden submit button forces the form to track changes and submit invisibly
-        st.form_submit_button(label='Invisible Search Trigger', invisible=True)
+        # FIX: Provide a visible submit button to satisfy the validation rule, and then hide it via CSS
+        st.form_submit_button(label='Search', type='secondary')
 
     
     # Use the session state values for filtering
